@@ -1,0 +1,11 @@
+**/__pycache__
+**/.pytest_cache
+backend/.venv
+backend/.env
+backend/storage
+backend/certs
+backend/tests
+samples
+scripts
+.git
+*.md

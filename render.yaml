@@ -1,0 +1,16 @@
+# Render Blueprint – free web service. Render → New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: phytosense-ar
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /api/status
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: PHYTO_THREADS
+        value: "1"
+      - key: GEMINI_API_KEY
+        sync: false          # optional – Render asks for the value; leave empty for offline assistant

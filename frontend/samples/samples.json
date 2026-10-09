@@ -1,0 +1,38 @@
+[
+ {
+  "file": "Potato_Late_blight_5305.jpg",
+  "label": "Potato – Late blight"
+ },
+ {
+  "file": "Corn_maize_Common_rust__1542.jpg",
+  "label": "Corn – Common rust"
+ },
+ {
+  "file": "Tomato_Leaf_Mold_8313.jpg",
+  "label": "Tomato – Leaf Mold"
+ },
+ {
+  "file": "Cherry_including_sour_Powdery_mildew_950.jpg",
+  "label": "Cherry – Powdery mildew"
+ },
+ {
+  "file": "Grape_Esca_Black_Measles__2471.jpg",
+  "label": "Grape – Esca (Black Measles)"
+ },
+ {
+  "file": "Tomato_Tomato_Yellow_Leaf_Curl_Virus_9548.jpg",
+  "label": "Tomato – Tomato Yellow Leaf Curl Virus"
+ },
+ {
+  "file": "Orange_Haunglongbing_Citrus_greening__3517.jpg",
+  "label": "Orange – Haunglongbing (Citrus greening)"
+ },
+ {
+  "file": "Apple_healthy_614.jpg",
+  "label": "Apple – healthy"
+ },
+ {
+  "file": "Tomato_healthy_10664.jpg",
+  "label": "Tomato – healthy"
+ }
+]
