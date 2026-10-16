@@ -95,6 +95,23 @@ Measured with the int8 ONNX model (laptop CPU, no GPU), 100 random images from t
 
 > ⚠️ PlantVillage photos are single detached leaves on plain backgrounds, and the model card notes possible train/test overlap. **Expect lower accuracy on real field photos** – report field results separately (see *Limitations*).
 
+### Train for real field photos (free Colab GPU)
+
+[training/train_field_model.ipynb](training/train_field_model.ipynb) fine-tunes the model on **PlantVillage + PlantDoc** (real field photos with cluttered backgrounds), using augmentation for zoom, rotation, lighting and blur. It prints before/after accuracy on the PlantDoc test set (real photos the model never saw during training).
+
+1. Open the notebook in [Google Colab](https://colab.research.google.com) (*File → Upload notebook*), then *Runtime → Change runtime type → T4 GPU → Run all* (~30–45 min).
+2. Unzip the downloaded `phytosense_model.zip` into `backend/model/` (replaces `model.onnx` + `labels.json`; `metrics.json` holds the report numbers).
+3. Restart the app. The labels are the same, so no code changes are needed.
+
+**Results of this fine-tuning (the model now in `backend/model/`; old one in `backend/model_backup_plantvillage/`):**
+
+| Test set | Original model | Fine-tuned | Fine-tuned, int8 ONNX (what the app runs) |
+| --- | --- | --- | --- |
+| PlantDoc test – **real field photos** (236 images, unseen) | 37.7 % | 75.4 % | **76.7 %** |
+| PlantVillage held-out – lab photos (760 images) | 100 % | 100 % | 99.9 % |
+
+Strongest on real photos: apple, grape, squash, strawberry, corn rust, healthy leaves (80–100 %). Weakest: corn gray leaf spot, potato early blight, tomato bacterial spot (25–45 %), which look alike in the field. Full numbers are in `backend/model/metrics.json`.
+
 ## 🔌 API (auto docs at `/docs`)
 
 | Method | Path | Purpose |
@@ -148,7 +165,7 @@ PhytoSense-AR/
 
 ## ⚠️ Limitations (state these in the viva)
 
-- Classifier knows **38 PlantVillage classes / 14 crops only**; any other plant is forced into one of them. Low confidence (< 55 %) is shown as *"Not sure – retake"*.
+- Classifier knows **38 PlantVillage classes / 14 crops only**; any other plant is forced into one of them. Field accuracy is ~77 % (PlantDoc test); orange greening, grape Esca/leaf blight and tomato target spot have no field training photos. Low confidence (< 55 %) is shown as *"Not sure – retake"*.
 - Lesion highlighting is colour-based: excellent for spots/blight/rust, weak for diffuse symptoms (mites, mosaic, citrus greening mottling) and for photos with many overlapping leaves.
 - Live AR needs the server (~0.3–0.4 s per frame on CPU); it is a 2D overlay on the video, not world-anchored 3D AR.
 - Treatment advice is general guidance – always confirm with the local agriculture officer / KVK.
