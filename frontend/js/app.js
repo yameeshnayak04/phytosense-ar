@@ -65,15 +65,28 @@ function initUpload() {
   });
 }
 
+const SAMPLE_GROUPS = { plants: "Common plants of Indore", problems: "Plant problems" };
+
+// "(c) Name, some rights reserved (CC BY)" -> "Name"
+const photographer = (credit) => credit.replace(/^\(c\)\s*/, "").replace(/,\s*(some|no) rights reserved.*$/i, "").trim();
+
 async function initSamples() {
   let samples = [];
   try { samples = await api("samples/samples.json"); } catch { return; }
   const box = $("#samples");
-  box.innerHTML = samples.map((s) => `
-    <button data-src="samples/${esc(s.file)}" title="${esc(s.label)}">
-      <img src="samples/${esc(s.file)}" alt="${esc(s.label)}" loading="lazy"><span>${esc(s.label)}</span>
-    </button>`).join("");
-  box.querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
+  box.innerHTML = Object.entries(SAMPLE_GROUPS).map(([group, title]) => `
+    <h4 class="sample-group">${title}</h4>
+    <div class="samples">${samples.filter((s) => s.group === group).map((s) => {
+      const who = photographer(s.credit || "");
+      return `
+      <div class="sample">
+        <button data-src="samples/${esc(s.file)}" title="Analyse: ${esc(s.label)}">
+          <img src="samples/${esc(s.file)}" alt="${esc(s.label)}" loading="lazy"><span>${esc(s.label)}</span>
+        </button>
+        <a class="credit" href="${esc(s.source)}" target="_blank" rel="noopener">© ${esc(who && !/rights/i.test(who) ? who : "iNaturalist")} · ${esc(s.license)}</a>
+      </div>`;
+    }).join("")}</div>`).join("");
+  box.querySelectorAll(".sample button").forEach((b) => b.addEventListener("click", async () => {
     const blob = await (await fetch(b.dataset.src)).blob();
     diagnoseFile(new File([blob], "sample.jpg", { type: blob.type || "image/jpeg" }));
   }));

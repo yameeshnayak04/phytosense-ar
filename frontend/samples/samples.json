@@ -1,38 +1,114 @@
 [
  {
-  "file": "Potato_Late_blight_5305.jpg",
-  "label": "Potato – Late blight"
+  "file": "money_plant.jpg",
+  "group": "plants",
+  "label": "Money plant (Pothos)",
+  "credit": "no rights reserved",
+  "license": "CC0",
+  "source": "https://www.inaturalist.org/observations/104746694"
  },
  {
-  "file": "Corn_maize_Common_rust__1542.jpg",
-  "label": "Corn – Common rust"
+  "file": "tulsi.jpg",
+  "group": "plants",
+  "label": "Tulsi (Holy basil)",
+  "credit": "(c) Swarochi Tathagath, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/64287124"
  },
  {
-  "file": "Tomato_Leaf_Mold_8313.jpg",
-  "label": "Tomato – Leaf Mold"
+  "file": "hibiscus.jpg",
+  "group": "plants",
+  "label": "Hibiscus (Gudhal)",
+  "credit": "no rights reserved",
+  "license": "CC0",
+  "source": "https://www.inaturalist.org/observations/68413783"
  },
  {
-  "file": "Cherry_including_sour_Powdery_mildew_950.jpg",
-  "label": "Cherry – Powdery mildew"
+  "file": "neem.jpg",
+  "group": "plants",
+  "label": "Neem",
+  "credit": "(c) Devendra Kumar Gurjar, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/211538359"
  },
  {
-  "file": "Grape_Esca_Black_Measles__2471.jpg",
-  "label": "Grape – Esca (Black Measles)"
+  "file": "peepal.jpg",
+  "group": "plants",
+  "label": "Peepal (Sacred fig)",
+  "credit": "(c) avocat, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/163218038"
  },
  {
-  "file": "Tomato_Tomato_Yellow_Leaf_Curl_Virus_9548.jpg",
-  "label": "Tomato – Tomato Yellow Leaf Curl Virus"
+  "file": "croton.jpg",
+  "group": "plants",
+  "label": "Croton",
+  "credit": "(c) Robin White, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/207052987"
  },
  {
-  "file": "Orange_Haunglongbing_Citrus_greening__3517.jpg",
-  "label": "Orange – Haunglongbing (Citrus greening)"
+  "file": "snake_plant.jpg",
+  "group": "plants",
+  "label": "Snake plant",
+  "credit": "no rights reserved",
+  "license": "CC0",
+  "source": "https://www.inaturalist.org/observations/218071479"
  },
  {
-  "file": "Apple_healthy_614.jpg",
-  "label": "Apple – healthy"
+  "file": "curry_leaf.jpg",
+  "group": "plants",
+  "label": "Curry leaf",
+  "credit": "(c) Subhadra Devi, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/52820495"
  },
  {
-  "file": "Tomato_healthy_10664.jpg",
-  "label": "Tomato – healthy"
+  "file": "rose_black_spot.jpg",
+  "group": "problems",
+  "label": "Rose Â· Leaf spot / blight",
+  "credit": "(c) giantcicada, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/75599510"
+ },
+ {
+  "file": "rose_powdery_mildew.jpg",
+  "group": "problems",
+  "label": "Powdery mildew",
+  "credit": "(c) Alex Press, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/370951139"
+ },
+ {
+  "file": "aphids.jpg",
+  "group": "problems",
+  "label": "Aphids Â· Pest infestation",
+  "credit": "(c) Ricard Busquets Reverte, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/192376877"
+ },
+ {
+  "file": "mealybugs.jpg",
+  "group": "problems",
+  "label": "Mealybugs Â· Pest infestation",
+  "credit": "(c) relew, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/385868264"
+ },
+ {
+  "file": "late_blight.jpg",
+  "group": "problems",
+  "label": "Tomato Â· Late blight",
+  "credit": "(c) Michal MaÅˆas, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/241958126"
+ },
+ {
+  "file": "corn_rust.jpg",
+  "group": "problems",
+  "label": "Maize (Corn) Â· Common rust",
+  "credit": "(c) Senna Bryce Robeson, some rights reserved (CC BY)",
+  "license": "CC-BY",
+  "source": "https://www.inaturalist.org/observations/308322258"
  }
 ]

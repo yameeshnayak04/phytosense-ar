@@ -175,7 +175,7 @@ PhytoSense-AR/
 │   └── requirements.txt, requirements-dev.txt
 ├── frontend/                 PWA (plain HTML/CSS/JS modules – no build step)
 │   ├── index.html, css/, js/ (app, ar, overlay, result, history, chat, library, util)
-│   ├── samples/              demo leaf images
+│   ├── samples/              demo photos (iNaturalist, CC0 / CC BY, credits in samples.json)
 │   ├── manifest.webmanifest, sw.js, icons/
 ├── training/                 Colab notebooks: train_field_model.ipynb (crop diseases), train_plant_id_model.ipynb (plants)
 ├── scripts/                  export_onnx.py (model export), make_cert.py (HTTPS), evaluate.py (accuracy)
@@ -214,6 +214,6 @@ PhytoSense-AR/
 
 ## 📄 Credits & licences
 - Disease model: [`kimcomehome/plantvillage-vit-leaf-disease`](https://huggingface.co/kimcomehome/plantvillage-vit-leaf-disease) (ViT-base fine-tuned on PlantVillage, CC BY-SA 3.0), exported to int8 ONNX by `scripts/export_onnx.py`.
-- Datasets: PlantVillage (Hughes & Salathé, 2015), PlantDoc (Singh et al., 2020), iNaturalist research-grade observations (CC0 / CC BY / CC BY-NC / CC BY-SA photos – per-photo attribution in `backend/model/inat_attribution.csv`), Imagenette (*not a plant* class). Sample images from the PlantVillage test split.
+- Datasets: PlantVillage (Hughes & Salathé, 2015), PlantDoc (Singh et al., 2020), iNaturalist research-grade observations (CC0 / CC BY / CC BY-NC / CC BY-SA photos – per-photo attribution in `backend/model/inat_attribution.csv`), Imagenette (*not a plant* class). Demo photos in `frontend/samples/` are iNaturalist field photos (CC0 / CC BY; photographer and link in `samples.json`, shown under each photo), not used in training; the test images in `samples/` are from the PlantVillage test split.
 - Plant model: ConvNeXt-Tiny (`convnext_tiny.fb_in22k_ft_in1k`, timm, Apache-2.0) fine-tuned by `training/train_plant_id_model.ipynb`.
 - Crop summaries: Wikipedia REST API.

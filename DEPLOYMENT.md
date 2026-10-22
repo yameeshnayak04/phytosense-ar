@@ -2,7 +2,7 @@
 
 PhytoSense AR deploys to **Render's free web service**. It costs nothing, and Render provides a public `https://` link, so the camera works on any phone.
 
-The AI model runs as an 87 MB int8 ONNX file (no PyTorch). Measured peak memory is about **230 MB**, under Render's 512 MB free limit.
+Two int8 ONNX models run on the CPU (no PyTorch): the crop-disease ViT (87 MB) and the plant-identification ConvNeXt (34 MB). Measured memory with both loaded is about **320 MB**, under Render's 512 MB free limit.
 
 | Option | Cost | Public link | Phone camera |
 | --- | --- | --- | --- |
@@ -23,12 +23,12 @@ The AI model runs as an 87 MB int8 ONNX file (no PyTorch). Measured peak memory 
 cd c:\project\Major_project\PhytoSense-AR
 git init
 git add .
-git commit -m "PhytoSense AR MVP"
+git commit -m "PhytoSense AR"
 git branch -M main
 git remote add origin https://github.com/<your-github-username>/phytosense-ar.git
 git push -u origin main
 ```
-The push takes a minute: it includes the 87 MB model file (`backend/model/model.onnx`), which is under GitHub's 100 MB limit. GitHub may print a "large file" warning; that is fine.
+The push takes a minute: it includes the model files (`backend/model/model.onnx` 87 MB, `plant_model.onnx` 34 MB), both under GitHub's 100 MB limit. GitHub may print a "large file" warning; that is fine.
 
 ### 2. Deploy on Render
 1. Sign up at <https://render.com> with your GitHub account. The free plan may ask you to verify with a card; free services are not charged.
@@ -70,6 +70,7 @@ Render redeploys automatically.
 | `GEMINI_MODEL` | auto | Force a specific Gemini model. |
 | `PHYTO_THREADS` | `1` on Render | CPU threads for the model. |
 | `PHYTO_MIN_CONFIDENCE` | `0.55` | Below this the app says "Not sure – retake". |
+| `PHYTO_MIN_SPECIES_CONFIDENCE` | `0.35` | Below this the plant is shown as "Unknown plant". |
 | `PHYTO_MAX_SCANS` | `500` | Older scans are deleted beyond this. |
 
 ### Troubleshooting
@@ -77,7 +78,8 @@ Render redeploys automatically.
 | --- | --- |
 | Build fails at `pip install` | Check that `PYTHON_VERSION` is `3.11.9`, then **Manual Deploy → Clear build cache & deploy**. |
 | `Out of memory` in Logs | Set `PHYTO_THREADS=1`. |
-| Page loads but says "AI model is loading…" | Wait about 20 seconds after waking; check Logs for `[classifier] loaded ONNX model`. |
+| Page loads but says "Loading AI models…" | Wait about 20–30 seconds after waking; check Logs for `[plant_id] loaded` and `[classifier] loaded ONNX model`. |
+| Status line has no "68 plants" | `backend/model/plant_model.onnx` and `plant_labels.json` are missing from the repo – commit them. |
 | `git push` rejected: file too large | Make sure `backend/model/model.onnx` is the 87 MB int8 file (re-create it with `python scripts/export_onnx.py`). |
 | Camera does not open | Use the `https://` link, and allow camera permission in the browser's site settings. |
 
