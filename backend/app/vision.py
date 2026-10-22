@@ -71,7 +71,7 @@ def segment_leaf(img_rgb: np.ndarray) -> dict:
     green_u8 = cv2.morphologyEx(green.astype(np.uint8) * 255, cv2.MORPH_OPEN, kernel)
     core = _largest_component(green_u8)
     empty = {"found": False, "leaf_polygon": [], "lesions": [], "bbox": None,
-             "severity": 0.0, "leaf_coverage": 0.0}
+             "severity": 0.0}
     if core.sum() == 0 or (core > 0).mean() < 0.02:
         return empty
 
@@ -114,7 +114,6 @@ def segment_leaf(img_rgb: np.ndarray) -> dict:
         "lesions": [_polygon(c, w, h, 0.006) for c in contours[:40]],
         "bbox": [round(x / w, 4), round(y / h, 4), round(bw / w, 4), round(bh / h, 4)],
         "severity": round(min(100.0, 100.0 * lesion_area / leaf_area), 1),
-        "leaf_coverage": round(leaf_area / (h * w), 3),
     }
 
 

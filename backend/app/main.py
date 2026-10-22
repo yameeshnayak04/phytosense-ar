@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from . import assistant, config, db, knowledge
 from .classifier import classifier
 from .diagnosis import diagnose
+from .plant_id import plant_identifier
 
 MAX_UPLOAD_BYTES = 12 * 1024 * 1024
 MAX_SIDE = 1600
@@ -28,13 +29,13 @@ MAX_SIDE = 1600
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     db.init()
-    # Load the model in the background so the server answers immediately.
-    threading.Thread(target=classifier.load, daemon=True).start()
+    # Load the models in the background so the server answers immediately.
+    threading.Thread(target=lambda: (plant_identifier.load(), classifier.load()), daemon=True).start()
     yield
 
 
-app = FastAPI(title="PhytoSense AR API", version="0.1.0", lifespan=lifespan,
-              description="AR-based AI plant health identification and disease diagnosis (MVP).")
+app = FastAPI(title="PhytoSense AR API", version="0.2.0", lifespan=lifespan,
+              description="AR-based AI plant identification and plant health / disease diagnosis.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -51,10 +52,15 @@ def _read_image(data: bytes) -> Image.Image:
     return img
 
 
+def _models_ready() -> bool:
+    return classifier.ready and (plant_identifier.ready or not plant_identifier.available)
+
+
 @app.get("/api/status")
 def status():
     return {"app": "PhytoSense AR", "version": app.version, "model": config.MODEL_ID,
-            "model_ready": classifier.ready, "classes": len(classifier.labels) or None,
+            "model_ready": _models_ready(), "classes": len(classifier.labels) or None,
+            "plant_model": plant_identifier.ready, "species": len(plant_identifier.species) - 1 if plant_identifier.ready else None,
             "assistant": "gemini" if assistant.gemini_enabled() else "offline",
             "languages": assistant.LANGUAGES}
 
@@ -77,7 +83,7 @@ def diagnose_image(file: UploadFile = File(...), save: bool = Form(True)):
 @app.post("/api/frame")
 def analyze_frame(file: UploadFile = File(...)):
     """Fast path for the live AR camera: small frame in, overlay + label out, nothing saved."""
-    if not classifier.ready:
+    if not _models_ready():
         raise HTTPException(503, "Model is still loading")
     img = _read_image(file.file.read())
     img.thumbnail((448, 448))
@@ -97,17 +103,6 @@ def scan(scan_id: int):
     return s
 
 
-class NoteIn(BaseModel):
-    note: str = Field(max_length=500)
-
-
-@app.patch("/api/scans/{scan_id}")
-def scan_note(scan_id: int, body: NoteIn):
-    if not db.update_note(scan_id, body.note):
-        raise HTTPException(404, "Scan not found")
-    return {"ok": True}
-
-
 @app.delete("/api/scans/{scan_id}")
 def remove_scan(scan_id: int):
     image = db.delete_scan(scan_id)
@@ -115,6 +110,12 @@ def remove_scan(scan_id: int):
         raise HTTPException(404, "Scan not found")
     (config.UPLOAD_DIR / image).unlink(missing_ok=True)
     return {"ok": True}
+
+
+@app.get("/api/plants")
+def plants():
+    return {"plants": list(knowledge.PLANTS.values()), "conditions": list(knowledge.CONDITIONS.values()),
+            "identifier_ready": plant_identifier.ready}
 
 
 @app.get("/api/diseases")

@@ -46,14 +46,19 @@ class DiseaseClassifier:
         x = x / 127.5 - 1.0
         return x.transpose(2, 0, 1)[None]
 
-    def predict(self, img_rgb: np.ndarray, top_k: int = 3) -> list[dict]:
+    def probabilities(self, img_rgb: np.ndarray) -> np.ndarray:
         self.load()
         logits = self.session.run(None, {"pixel_values": self.preprocess(img_rgb)})[0][0]
         probs = np.exp(logits - logits.max())
-        probs /= probs.sum()
+        return probs / probs.sum()
+
+    def top(self, probs: np.ndarray, top_k: int = 3) -> list[dict]:
         idx = np.argsort(probs)[::-1][:top_k]
         return [{"index": int(i), "label": self.labels[int(i)], "confidence": round(float(probs[i]), 4)}
-                for i in idx]
+                for i in idx if probs[i] > 0]
+
+    def predict(self, img_rgb: np.ndarray, top_k: int = 3) -> list[dict]:
+        return self.top(self.probabilities(img_rgb), top_k)
 
 
 classifier = DiseaseClassifier()

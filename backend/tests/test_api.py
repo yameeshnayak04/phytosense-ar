@@ -92,3 +92,73 @@ def test_offline_chat_answers_from_knowledge_base(client, monkeypatch):
     r = client.post("/api/chat", json={"message": "How do I treat tomato early blight?"}).json()
     assert r["source"] == "offline"
     assert "Early blight" in r["reply"]
+
+
+# ---------- plant identification (uses a stand-in for the trained plant model) ----------
+from app import diagnosis  # noqa: E402
+from app.plant_id import plant_identifier  # noqa: E402
+
+NOTEBOOK = Path(__file__).resolve().parents[2] / "training" / "train_plant_id_model.ipynb"
+
+
+def _notebook_classes() -> dict:
+    cells = json.loads(NOTEBOOK.read_text(encoding="utf-8"))["cells"]
+    src = next("".join(c["source"]) for c in cells if c["cell_type"] == "code" and "LOCAL_PLANTS" in "".join(c["source"]))
+    ns: dict = {}
+    exec(src, ns)
+    return ns
+
+
+def test_knowledge_covers_every_trained_class():
+    ns = _notebook_classes()
+    assert set(ns["SPECIES"]) - {"not_plant"} == set(knowledge.PLANTS)
+    assert set(ns["CONDITIONS"]) == set(knowledge.CONDITIONS)
+    for p in knowledge.PLANTS.values():
+        assert p.get("pv_crop") is None or p["pv_crop"] in knowledge.CROPS
+        assert {"name", "hindi", "scientific", "category", "care", "problems"} <= p.keys()
+
+
+def _fake_plant_model(monkeypatch, species: str, condition: str = "healthy", p: float = 0.9):
+    monkeypatch.setattr(plant_identifier, "session", object())
+    monkeypatch.setattr(plant_identifier, "predict", lambda full, leaf=None: {
+        "species": [{"id": species, "confidence": p}, {"id": "neem", "confidence": 0.05}],
+        "condition": [{"id": condition, "confidence": p}, {"id": "healthy", "confidence": 0.05}]})
+
+
+def test_crop_species_uses_crop_specific_disease_model(monkeypatch):
+    _fake_plant_model(monkeypatch, "tomato")
+    r = diagnosis.diagnose(synthetic_leaf(True), with_details=False)
+    assert r["source"] == "crop_disease_model" and r["label"].startswith("Tomato___")
+    assert r["crop"] == "Tomato" and r["species"]["id"] == "tomato"
+
+
+def test_local_plant_uses_leaf_condition(monkeypatch):
+    _fake_plant_model(monkeypatch, "rose", "powdery_mildew")
+    r = diagnosis.diagnose(synthetic_leaf(True), with_details=True)
+    assert r["source"] == "condition_model" and r["label"] == "rose:powdery_mildew"
+    assert r["status"] == "diseased" and r["disease"] == "Powdery mildew" and r["severity_reliable"]
+    assert r["plant_info"]["hindi"] == "गुलाब" and r["info"]["organic"]
+
+
+def test_variegated_plant_skips_colour_severity(monkeypatch):
+    _fake_plant_model(monkeypatch, "croton", "healthy")
+    r = diagnosis.diagnose(synthetic_leaf(True), with_details=False)
+    assert not r["severity_reliable"] and r["overlay"]["lesions"] == [] and r["severity"] == 0
+
+
+def test_not_a_plant(monkeypatch):
+    _fake_plant_model(monkeypatch, "not_plant")
+    assert diagnosis.diagnose(synthetic_leaf(False), with_details=False)["status"] == "no_plant"
+
+
+def test_plants_endpoint(client):
+    r = client.get("/api/plants").json()
+    assert len(r["plants"]) == len(knowledge.PLANTS) >= 60 and len(r["conditions"]) == 7
+
+
+def test_offline_chat_answers_plant_care(client, monkeypatch):
+    monkeypatch.setattr("app.config.GEMINI_API_KEY", "")
+    r = client.post("/api/chat", json={"message": "How often should I water my money plant?"}).json()
+    assert "Money plant" in r["reply"] and "Water" in r["reply"]
+    r = client.post("/api/chat", json={"message": "white powder on my rose leaves"}).json()
+    assert "Rose – Powdery mildew" in r["reply"]

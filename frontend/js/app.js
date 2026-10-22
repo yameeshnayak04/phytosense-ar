@@ -22,8 +22,8 @@ async function pollStatus() {
     const s = await api("/api/status");
     state.status = s;
     line.textContent = s.model_ready
-      ? `AI ready · ${s.classes} classes · assistant: ${s.assistant}`
-      : "Loading AI model… (first run downloads ~340 MB)";
+      ? `AI ready · ${s.species ? `${s.species} plants · ` : ""}${s.classes} crop diseases · assistant: ${s.assistant}`
+      : "Loading AI models…";
     const sel = $("#lang-select");
     if (!sel.options.length) {
       sel.innerHTML = Object.entries(s.languages).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");

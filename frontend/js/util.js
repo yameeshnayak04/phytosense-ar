@@ -8,7 +8,7 @@ export const state = {
   status: null,          // /api/status payload
 };
 
-export function localStorageGet(key) {
+function localStorageGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 export function localStorageSet(key, value) {
@@ -77,7 +77,8 @@ export const STATUS_TEXT = {
   healthy: "Healthy",
   diseased: "Disease detected",
   uncertain: "Not sure – retake",
-  no_leaf: "No leaf found",
+  no_leaf: "Move closer to a leaf",
+  no_plant: "No plant found",
 };
 
 export function healthColor(score) {

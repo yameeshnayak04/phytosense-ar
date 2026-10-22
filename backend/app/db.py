@@ -74,11 +74,6 @@ def get_scan(scan_id: int) -> dict | None:
     return _row(r, full=True) if r else None
 
 
-def update_note(scan_id: int, note: str) -> bool:
-    with connect() as c:
-        return c.execute("UPDATE scans SET note = ? WHERE id = ?", (note, scan_id)).rowcount > 0
-
-
 def delete_scan(scan_id: int) -> str | None:
     with connect() as c:
         r = c.execute("SELECT image FROM scans WHERE id = ?", (scan_id,)).fetchone()

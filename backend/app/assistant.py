@@ -59,13 +59,17 @@ def _pick_model() -> str:
 def _context_text(context: dict | None) -> str:
     if not context:
         return "No scan yet."
-    lines = [f"Latest scan: crop={context.get('crop')}, result={context.get('disease')}, "
+    lines = [f"Latest scan: plant={context.get('crop')}, result={context.get('disease')}, "
              f"status={context.get('status')}, confidence={round(100 * float(context.get('confidence', 0)))}%, "
              f"infected leaf area={context.get('severity')}%, severity={context.get('severity_level')}."]
-    entry = knowledge.lookup(context.get("label", "")) if context.get("label") else None
+    entry = knowledge.entry_for_label(context.get("label", "")) if context.get("label") else None
     if entry:
         lines.append(f"Knowledge base: symptoms: {entry['symptoms']} Chemical: {'; '.join(entry['chemical'])}. "
                      f"Organic: {'; '.join(entry['organic'])}. Prevention: {'; '.join(entry['prevention'])}.")
+    p = knowledge.PLANTS.get((context.get("species") or {}).get("id", ""))
+    if p:
+        lines.append(f"Plant: {p['name']} ({p['scientific']}). Care: {p['care']}. Common problems: {'; '.join(p['problems'])}."
+                     + (f" Warning: {p['toxic']}." if p.get("toxic") else ""))
     return "\n".join(lines)
 
 
@@ -91,21 +95,57 @@ def _bullets(items: list[str]) -> str:
     return "\n".join(f"- {i}" for i in items) if items else "- None needed"
 
 
+def _plant_answer(p: dict) -> str:
+    care = p.get("care", {})
+    out = [f"**{p['name']}** ({p.get('hindi', '')}) – _{p['scientific']}_, {p['category'].lower()}", p.get("uses", "")]
+    if p.get("toxic"):
+        out.append(f"⚠️ {p['toxic']}.")
+    labels = {"sun": "Light", "water": "Water", "soil": "Soil"}
+    out.append(f"*Care:*\n{_bullets([f'{labels[k]}: {care[k]}' for k in labels if care.get(k) not in (None, '-')])}")
+    out.append(f"*Common problems:*\n{_bullets(p['problems'])}")
+    out.append("Scan a leaf to check its health.")
+    return "\n\n".join(x for x in out if x)
+
+
+_CONDITION_WORDS = {
+    "powdery_mildew": ("powdery", "mildew", "white powder"),
+    "rust": ("rust", "orange spots", "pustule"),
+    "sooty_mould": ("sooty", "black coating", "black powder"),
+    "mosaic_yellowing": ("mosaic", "virus", "curl", "yellow vein", "mottl"),
+    "pest_infestation": ("mealybug", "aphid", "whitefl", "insect", "pest", "scale", "mite", "miner", "bug"),
+    "leaf_spot_blight": ("spot", "blight", "black spot", "brown patch", "anthracnose", "fungus", "fungal"),
+}
+
+
 def _offline_answer(message: str, context: dict | None) -> str:
     q = message.lower()
     entry = None
-    # A disease named in the question wins over the last scan.
-    for e in knowledge.ENTRIES:
-        if not e["healthy"] and e["disease"].lower() in q and e["crop"].lower() in q:
-            entry = e
-            break
-    if entry is None:
+    plant = knowledge.find_plant(message)
+    # A plant without a dedicated disease model + a symptom word -> the general condition for that plant.
+    if plant and not plant.get("pv_crop"):
+        cond = next((c for c, words in _CONDITION_WORDS.items() if any(w in q for w in words)), None)
+        if cond:
+            entry = knowledge.condition_entry(cond, plant)
+    # A crop disease named in the question wins over the last scan.
+    if entry is None and (plant is None or plant.get("pv_crop")):
         for e in knowledge.ENTRIES:
-            if not e["healthy"] and e["disease"].lower() in q:
+            if not e["healthy"] and e["disease"].lower() in q and e["crop"].lower() in q:
                 entry = e
                 break
+        if entry is None:
+            for e in knowledge.ENTRIES:
+                if not e["healthy"] and e["disease"].lower() in q:
+                    entry = e
+                    break
+    # A plant named in the question (or the scanned plant, for care questions) gets a care answer.
+    care_question = any(w in q for w in ("water", "sun", "light", "soil", "care", "grow", "fertil", "pot", "problem",
+                                         "toxic", "poison", "about"))
+    if plant is None and care_question and context:
+        plant = knowledge.PLANTS.get((context.get("species") or {}).get("id", ""))
+    if entry is None and plant is not None:
+        return _plant_answer(plant)
     if entry is None and context and context.get("label"):
-        entry = knowledge.lookup(context["label"])
+        entry = knowledge.entry_for_label(context["label"])
     if entry is None:
         return ("I answer from my offline plant-disease library right now. Scan a leaf first, or ask about a "
                 "disease by name, e.g. \"How do I treat tomato early blight?\"\n\n"

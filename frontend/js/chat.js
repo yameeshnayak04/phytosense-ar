@@ -46,7 +46,7 @@ function addMessage(role, text, source) {
   return div;
 }
 
-export async function send(text) {
+async function send(text) {
   addMessage("user", text);
   const typing = addMessage("bot", "Thinking…");
   typing.classList.add("typing");

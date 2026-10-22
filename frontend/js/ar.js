@@ -4,6 +4,7 @@ import { drawOverlay } from "./overlay.js";
 
 const FRAME_SIDE = 448;          // frames sent for live inference
 const STALE_MS = 1500;           // hide overlay if no fresh answer
+const SMOOTH_N = 6;              // live answers used to stabilise the label
 
 let stream = null;
 let facing = "environment";
@@ -11,6 +12,7 @@ let live = true;
 let inferring = false;
 let latest = null;
 let latestAt = 0;
+let recent = [];                 // last live answers, for the majority-vote label
 let lastTimes = [];
 let rafId = 0;
 let onCaptured = () => {};
@@ -33,7 +35,7 @@ export function initAR({ onResult }) {
   });
 }
 
-export async function startCamera() {
+async function startCamera() {
   const err = $("#cam-error");
   err.textContent = "";
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -58,6 +60,7 @@ export async function startCamera() {
   for (const id of ["#btn-live", "#btn-capture", "#btn-flip"]) $(id).disabled = false;
   sizeCanvas();
   latest = null;
+  recent = [];
   cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(render);
   inferLoop();
@@ -118,7 +121,7 @@ async function inferLoop() {
     if (!video().videoWidth) { await sleep(100); continue; }
     const t0 = performance.now();
     try {
-      latest = await postImage("/api/frame", await grabFrame(FRAME_SIDE));
+      latest = stabilise(await postImage("/api/frame", await grabFrame(FRAME_SIDE)));
       latestAt = performance.now();
       lastTimes = [...lastTimes.slice(-4), latestAt - t0];
       const avg = lastTimes.reduce((a, b) => a + b, 0) / lastTimes.length;
@@ -131,6 +134,33 @@ async function inferLoop() {
   inferring = false;
 }
 
+// Single frames can flicker between similar plants or diseases. Show the answer that won most of the
+// last few frames (ties broken by confidence); geometry (outline, lesions) always comes from the newest frame.
+function stabilise(r) {
+  recent = [...recent.slice(-(SMOOTH_N - 1)), r];
+  const votes = new Map();
+  for (const x of recent) {
+    const key = `${x.status}|${x.crop}|${x.disease}`;
+    const v = votes.get(key) || { n: 0, conf: 0, last: x };
+    v.n += 1; v.conf += x.confidence; v.last = x;
+    votes.set(key, v);
+  }
+  const best = [...votes.values()].sort((a, b) => b.n - a.n || b.conf - a.conf)[0];
+  const w = best.last;
+  return { ...r, status: w.status, crop: w.crop, disease: w.disease, species: w.species, healthy: w.healthy,
+    health_score: w.health_score, severity_reliable: w.severity_reliable,
+    confidence: best.conf / best.n, stable: best.n >= Math.min(3, recent.length) };
+}
+
+function hint(r) {
+  if (r.status === "no_plant") return "No plant in view";
+  if (!r.stable) return "Identifying…";
+  if (!r.leaf_found) return r.species ? `${r.crop} – move closer to one leaf for a health check` : "Point at a plant or leaf";
+  if (r.status === "uncertain") return "Hold steady, move closer";
+  if (r.status === "healthy") return `${r.crop} looks healthy`;
+  return "Problem spotted – tap ● for details";
+}
+
 function render(t) {
   const c = canvas();
   const ctx = c.getContext("2d");
@@ -141,10 +171,7 @@ function render(t) {
     drawOverlay(ctx, latest, coverMap(), { scale: dpr, pulse: (t % 1500) / 1500 });
   }
   if (live) {
-    $("#ar-hint").textContent = !fresh ? "Looking for a leaf…"
-      : !latest.leaf_found ? "Point at a single leaf"
-      : latest.status === "uncertain" ? "Hold steady, move closer"
-      : latest.status === "healthy" ? "Leaf looks healthy" : "Disease spotted – tap ● for details";
+    $("#ar-hint").textContent = fresh ? hint(latest) : "Looking for a plant…";
   } else {
     $("#ar-hint").textContent = "Live AR paused";
   }

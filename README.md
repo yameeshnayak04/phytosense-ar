@@ -1,24 +1,26 @@
 # 🌿 PhytoSense AR
 ### AR-Based AI Plant Health Identification and Disease Diagnosis System
 
-*College major project – MVP.* Point a phone camera at a leaf: PhytoSense AR outlines the leaf, highlights the diseased spots **live on the camera view (augmented reality)**, names the disease, scores its severity, and tells you how to treat and prevent it, with an AI assistant you can ask follow-up questions in English or Indian languages.
+*College major project.* Point a phone camera at a plant: PhytoSense AR **identifies the plant** (68 species: 55 plants common in Indore / central India such as money plant, rose, banyan, peepal, neem, tulsi and gulmohar, plus 13 crops), outlines the leaf, highlights the diseased spots **live on the camera view (augmented reality)**, names the disease or leaf condition, scores its severity, and tells you how to treat and prevent it, with an AI assistant you can ask follow-up questions in English or Indian languages.
 
 Everything is **free and open-source**: no paid API, no GPU, no hardware needed.
 
 ---
 
-## ✨ Features (MVP)
+## ✨ Features
 
 | Module | What it does |
 | --- | --- |
+| **Plant identification** | ConvNeXt-Tiny (int8 ONNX, 34 MB) trained on iNaturalist field photos: 68 species + *not a plant*. Shows Hindi name, scientific name, top-3 alternatives, care tips, common problems and toxicity warnings (kaner, aak, parthenium…). |
+| **Leaf condition (any plant)** | Second head of the same model: healthy, leaf spot / blight, powdery mildew, rust, sooty mould, mosaic / yellowing, pest infestation – used for plants without a crop-specific disease model. |
 | **AR Live Scanner** | Camera feed with a live overlay: dashed leaf outline, pulsing red lesion patches, corner brackets and a floating label (*crop · disease · confidence · infected % · health*). |
-| **Disease Diagnosis** | 38 PlantVillage classes across 14 crops (Vision Transformer, int8 ONNX – 87 MB, no PyTorch). Leaf is segmented first and the crop of the leaf is classified. |
+| **Crop disease diagnosis** | 38 classes across 14 crops (Vision Transformer fine-tuned on PlantVillage + PlantDoc field photos, int8 ONNX). Once the plant model says "tomato", only tomato diseases are considered. Live labels are stabilised by a vote over the last 6 frames. |
 | **Severity & Health score** | Infected-area % from lesion segmentation → severity (early / moderate / severe) and a 0–100 health score. |
 | **Treatment knowledge base** | Symptoms, cause, chemical + organic treatment, prevention for every class; Hindi crop names. |
 | **Crop info** | Scientific name + Wikipedia summary of the crop. |
 | **AI Assistant** | Google Gemini (free tier) with the scan as context, farming-only prompt, 9 languages, voice input. Works **offline** from the knowledge base when no API key is set. |
 | **History** | Every saved scan with photo, stats and a health-trend chart (SQLite). |
-| **Disease Library** | Searchable list of all 38 classes, filter by crop. |
+| **Library** | Searchable plants (by type), crop diseases (by crop) and leaf conditions. |
 | **Installable PWA** | Add to home screen on Android; app shell works offline. Read-aloud of results. |
 
 ## 🧱 Architecture
@@ -35,7 +37,9 @@ Phone / laptop browser (PWA)                 FastAPI backend (Python)           
                                              └──────────────────────────────┘
 ```
 
-**Pipeline per image:** HSV + Excess-Green segmentation finds the leaf (background model from the image border removes shadows/table) → symptom-coloured pixels inside the leaf become lesion polygons → leaf is cropped and classified by the ViT → knowledge-base lookup → severity, health score, overlay geometry returned as JSON → the browser draws the AR layer.
+**Pipeline per image:** HSV + Excess-Green segmentation finds the leaf (background model from the image border removes shadows/table) → symptom-coloured pixels inside the leaf become lesion polygons → the **plant model** identifies the species from the whole frame + leaf crop → crops with a disease model (tomato, potato, maize, grape, citrus, …) go to the **ViT restricted to that crop's diseases**; every other plant gets the **leaf-condition** result → knowledge-base lookup → severity, health score, overlay geometry returned as JSON → the browser draws the AR layer. For plants with naturally coloured leaves (croton, coleus, variegated money plant …) colour-based severity is switched off.
+
+Without `backend/model/plant_model.onnx` the app falls back to the crop-disease model only.
 
 Live AR sends a 448-px frame to `/api/frame` as soon as the previous answer arrives (≈2–3 overlay updates/s on a laptop CPU). The shutter sends a full-resolution photo to `/api/diagnose`, which is saved to history.
 
@@ -48,7 +52,7 @@ setup.cmd        :: one time – creates backend\.venv and installs the requirem
 run.cmd          :: starts the server and opens http://localhost:8000
 ```
 
-The model file is included, so the app runs fully offline (except Wikipedia/Gemini). Uses about 230 MB RAM.
+The model files are included, so the app runs fully offline (except Wikipedia/Gemini). Uses about 320 MB RAM with both models loaded.
 
 Manual / Linux / macOS:
 
@@ -95,6 +99,16 @@ Measured with the int8 ONNX model (laptop CPU, no GPU), 100 random images from t
 
 > ⚠️ PlantVillage photos are single detached leaves on plain backgrounds, and the model card notes possible train/test overlap. **Expect lower accuracy on real field photos** – report field results separately (see *Limitations*).
 
+### Train the plant-identification model (free Colab GPU) – **required for plant ID**
+
+[training/train_plant_id_model.ipynb](training/train_plant_id_model.ipynb) downloads ~20,000 openly licensed iNaturalist field photos (Indian observations first) for the 68 species and 6 symptom groups, plus PlantVillage, PlantDoc and Imagenette (*not a plant*), and trains ConvNeXt-Tiny with a species head and a leaf-condition head.
+
+1. Open it in [Google Colab](https://colab.research.google.com), *Runtime → Change runtime type → T4 GPU → Run all* (~60–80 min).
+2. Unzip the downloaded `phytosense_plant_model.zip` into `backend/model/` (`plant_model.onnx`, `plant_labels.json`, `plant_metrics.json`, `inat_attribution.csv`).
+3. Restart the app; the status line shows *68 plants*.
+
+To change the plant list, edit `LOCAL_PLANTS` in [training/build_plant_notebook.py](training/build_plant_notebook.py), regenerate the notebook, and add the plant to [backend/data/plants.json](backend/data/plants.json) (a test checks both lists match).
+
 ### Train for real field photos (free Colab GPU)
 
 [training/train_field_model.ipynb](training/train_field_model.ipynb) fine-tunes the model on **PlantVillage + PlantDoc** (real field photos with cluttered backgrounds), using augmentation for zoom, rotation, lighting and blur. It prints before/after accuracy on the PlantDoc test set (real photos the model never saw during training).
@@ -112,16 +126,30 @@ Measured with the int8 ONNX model (laptop CPU, no GPU), 100 random images from t
 
 Strongest on real photos: apple, grape, squash, strawberry, corn rust, healthy leaves (80–100 %). Weakest: corn gray leaf spot, potato early blight, tomato bacterial spot (25–45 %), which look alike in the field. Full numbers are in `backend/model/metrics.json`.
 
+**Plant-identification model results** (`backend/model/plant_metrics.json`, held-out test split of 4,808 images, int8 ONNX):
+
+| Metric | Value |
+| --- | --- |
+| Species top-1 / top-5 (68 plants + *not a plant*) | **90.5 %** / 98.2 % |
+| Local plants, iNaturalist field photos | 88.7 % top-1, 97.7 % top-5 |
+| Crop recognised on PlantDoc field photos | 93.2 % |
+| Leaf condition (7 groups) | **96.6 %** |
+| Unseen Wikipedia photos (20 local plants + car, cat, laptop) | 23 / 23 correct |
+| Model size / CPU time | 34 MB / ~165 ms for 2 views |
+
+Hardest species: mango, arjun, jamun, banyan, eucalyptus (52–75 %) – large trees photographed from far away, often confused with similar trees.
+
 ## 🔌 API (auto docs at `/docs`)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/status` | model ready, classes, assistant mode, languages |
+| GET | `/api/status` | models ready, crop classes, plant species, assistant mode, languages |
 | POST | `/api/diagnose` | full diagnosis of an uploaded image (multipart `file`), saved to history |
 | POST | `/api/frame` | fast live-AR analysis of a camera frame (not saved) |
 | GET | `/api/scans`, `/api/scans/{id}` | history list + stats / one scan |
-| PATCH / DELETE | `/api/scans/{id}` | add note / delete scan |
-| GET | `/api/diseases` | knowledge base (library) |
+| DELETE | `/api/scans/{id}` | delete scan |
+| GET | `/api/plants` | plants the model identifies + leaf conditions (library) |
+| GET | `/api/diseases` | crop-disease knowledge base (library) |
 | POST | `/api/chat` | assistant `{message, history, context, lang}` |
 
 ## 📁 Project structure
@@ -138,15 +166,20 @@ PhytoSense-AR/
 │   │   ├── assistant.py     Gemini / offline assistant
 │   │   ├── db.py            SQLite scan history
 │   │   └── config.py        settings from .env
-│   ├── data/knowledge_base.json
+│   ├── app/                  main (API), diagnosis (pipeline), vision (segmentation), classifier (crop diseases),
+│   │                         plant_id (plant + leaf condition), knowledge, assistant, db, config
+│   ├── data/                 knowledge_base.json (crop diseases), plants.json (68 plants), conditions.json (7 conditions)
 │   ├── tests/test_api.py
-│   ├── model/               model.onnx (int8 ViT) + labels.json
+│   ├── model/                model.onnx (int8 ViT, crop diseases) + labels.json,
+│   │                         plant_model.onnx (int8 ConvNeXt-Tiny, plants + conditions) + plant_labels.json, metrics, iNaturalist attribution
 │   └── requirements.txt, requirements-dev.txt
 ├── frontend/                 PWA (plain HTML/CSS/JS modules – no build step)
 │   ├── index.html, css/, js/ (app, ar, overlay, result, history, chat, library, util)
 │   ├── samples/              demo leaf images
 │   ├── manifest.webmanifest, sw.js, icons/
+├── training/                 Colab notebooks: train_field_model.ipynb (crop diseases), train_plant_id_model.ipynb (plants)
 ├── scripts/                  export_onnx.py (model export), make_cert.py (HTTPS), evaluate.py (accuracy)
+├── docs/                     IEEE paper draft + figures
 ├── samples/                  PlantVillage test images used in tests
 ├── render.yaml, Dockerfile, DEPLOYMENT.md, setup.cmd, run.cmd, run_https.cmd
 ```
@@ -165,20 +198,22 @@ PhytoSense-AR/
 
 ## ⚠️ Limitations (state these in the viva)
 
-- Classifier knows **38 PlantVillage classes / 14 crops only**; any other plant is forced into one of them. Field accuracy is ~77 % (PlantDoc test); orange greening, grape Esca/leaf blight and tomato target spot have no field training photos. Low confidence (< 55 %) is shown as *"Not sure – retake"*.
+- Plant ID covers 68 species; other plants are shown as *Unknown plant* below 35 % confidence, but may still be confused with a similar-looking species. Leaf conditions are general groups, not exact disease names, and nutrient deficiencies are only covered under *mosaic / yellowing*.
+- Crop disease classifier knows **38 PlantVillage classes / 14 crops**. Field accuracy is ~77 % (PlantDoc test); orange greening, grape Esca/leaf blight and tomato target spot have no field training photos. Low confidence (< 55 %) is shown as *"Not sure – retake"*.
 - Lesion highlighting is colour-based: excellent for spots/blight/rust, weak for diffuse symptoms (mites, mosaic, citrus greening mottling) and for photos with many overlapping leaves.
-- Live AR needs the server (~0.3–0.4 s per frame on CPU); it is a 2D overlay on the video, not world-anchored 3D AR.
+- Live AR needs the server (~0.4–0.6 s per frame on a laptop CPU, much slower on the free Render plan); it is a 2D overlay on the video, not world-anchored 3D AR.
 - Treatment advice is general guidance – always confirm with the local agriculture officer / KVK.
-- No user accounts (single-user history) – fine for an MVP demo.
+- No user accounts (single-user history).
 
 ## 🔮 Future work
 
 1. Fine-tune a **YOLOv8n-seg / YOLO11n-seg** model on PlantDoc + own field photos (notebooks in the PlantDoc and Agri-Lens references) for true per-lesion detection.
 2. Export to **ONNX Runtime Web / TF.js** to run the live AR fully on the phone.
-3. Add an "unknown plant" class / species identifier (Pl@ntNet API) before disease classification.
+3. Collect own field photos of Indore plants to measure and improve local accuracy; add more species and exact diseases for common ornamentals (e.g. rose black spot vs. other leaf spots).
 4. Login + cloud database (Supabase free tier), weather-based disease-risk alerts, multi-leaf detection.
 
 ## 📄 Credits & licences
 - Disease model: [`kimcomehome/plantvillage-vit-leaf-disease`](https://huggingface.co/kimcomehome/plantvillage-vit-leaf-disease) (ViT-base fine-tuned on PlantVillage, CC BY-SA 3.0), exported to int8 ONNX by `scripts/export_onnx.py`.
-- Dataset: PlantVillage (Hughes & Salathé, 2015). Sample images from the PlantVillage test split.
+- Datasets: PlantVillage (Hughes & Salathé, 2015), PlantDoc (Singh et al., 2020), iNaturalist research-grade observations (CC0 / CC BY / CC BY-NC / CC BY-SA photos – per-photo attribution in `backend/model/inat_attribution.csv`), Imagenette (*not a plant* class). Sample images from the PlantVillage test split.
+- Plant model: ConvNeXt-Tiny (`convnext_tiny.fb_in22k_ft_in1k`, timm, Apache-2.0) fine-tuned by `training/train_plant_id_model.ipynb`.
 - Crop summaries: Wikipedia REST API.

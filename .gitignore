@@ -6,3 +6,4 @@ backend/.env
 backend/storage/
 backend/certs/
 node_modules/
+docs

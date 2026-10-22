@@ -6,7 +6,10 @@ const COLORS = {
   diseased: "#ef4444",
   uncertain: "#f59e0b",
   no_leaf: "#f59e0b",
+  no_plant: "#94a3b8",
 };
+
+const short = (s) => String(s || "").replace(/\s*\(.*\)\s*$/, "");
 
 function path(ctx, pts, map) {
   ctx.beginPath();
@@ -28,7 +31,16 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 export function drawOverlay(ctx, result, map, { scale = 1, pulse = 0, showLabel = true } = {}) {
-  if (!result || !result.leaf_found) return;
+  if (!result) return;
+  if (!result.leaf_found) {
+    // Whole plant / tree in view: name it, ask for a closer leaf for the health check.
+    if (showLabel && result.species) {
+      const cw = ctx.canvas.width;
+      drawTag(ctx, `${result.crop}${result.species.hindi ? ` · ${result.species.hindi}` : ""}`,
+        `${Math.round(result.species.confidence * 100)}% sure · move closer to a leaf`, cw * 0.3, 70 * scale, cw * 0.7, "#38bdf8", scale);
+    }
+    return;
+  }
   const { overlay } = result;
   const color = COLORS[result.status] || COLORS.uncertain;
   const s = scale;
@@ -82,17 +94,20 @@ export function drawOverlay(ctx, result, map, { scale = 1, pulse = 0, showLabel 
     ctx.stroke();
     ctx.restore();
 
-    if (showLabel) drawTag(ctx, result, x0, y0, x1, color, s);
+    if (showLabel) {
+      const title = result.status === "healthy" ? `${result.crop} · Healthy`
+        : result.status === "uncertain" ? `${result.crop} · not sure – move closer`
+        : `${result.crop} · ${short(result.disease)}`;
+      const pctTxt = `${Math.round(result.confidence * 100)}% sure`;
+      const sub = result.status === "uncertain" ? `best guess: ${short(result.disease)} ${pctTxt}`
+        : result.severity_reliable === false || result.healthy ? `${pctTxt} · health ${result.health_score}`
+        : `${pctTxt} · ${result.severity}% infected · health ${result.health_score}`;
+      drawTag(ctx, title, sub, x0, y0, x1, color, s);
+    }
   }
 }
 
-function drawTag(ctx, result, x0, y0, x1, color, s) {
-  const title = result.status === "healthy" ? `${result.crop} · Healthy`
-    : result.status === "uncertain" ? "Not sure – move closer"
-    : `${result.crop} · ${result.disease}`;
-  const sub = result.status === "uncertain"
-    ? `best guess: ${result.disease} ${Math.round(result.confidence * 100)}%`
-    : `${Math.round(result.confidence * 100)}% sure · ${result.severity}% infected · health ${result.health_score}`;
+function drawTag(ctx, title, sub, x0, y0, x1, color, s) {
   ctx.save();
   ctx.font = `700 ${14 * s}px system-ui, sans-serif`;
   const w1 = ctx.measureText(title).width;

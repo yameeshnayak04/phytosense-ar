@@ -11,7 +11,7 @@ export function initResult({ onAskAssistant }) {
   document.addEventListener("keydown", (e) => e.key === "Escape" && closeSheet());
 }
 
-export function closeSheet() {
+function closeSheet() {
   $("#sheet").hidden = true;
   $("#sheet-backdrop").hidden = true;
   speechSynthesis?.cancel?.();
@@ -26,11 +26,17 @@ export function showResult(r, imageSrc) {
   const info = r.info || {};
   const cropInfo = r.crop_info || {};
   const wiki = cropInfo.wikipedia || {};
-  const title = r.status === "healthy" ? "Healthy leaf" : r.disease;
+  const plant = r.plant_info;
+  const title = r.status === "no_plant" ? "No plant found" : r.status === "healthy" ? "Healthy" : r.disease;
+  const measured = !r.healthy && r.severity_reliable !== false;
 
   let alert = "";
-  if (r.status === "no_leaf") {
-    alert = `<div class="alert warn">No clear leaf was found. Place one leaf in the centre, fill the frame and use even light. The guess below may be wrong.</div>`;
+  if (r.status === "no_plant") {
+    alert = `<div class="alert warn">No plant was detected. Point the camera at a plant or a leaf and try again.</div>`;
+  } else if (r.status === "no_leaf") {
+    alert = r.species
+      ? `<div class="alert warn">Identified as <b>${esc(r.crop)}</b>. For a reliable health check, move closer so one leaf fills the frame.</div>`
+      : `<div class="alert warn">No clear leaf was found. Place one leaf in the centre, fill the frame and use even light. The guess below may be wrong.</div>`;
   } else if (r.status === "uncertain") {
     alert = `<div class="alert warn">The model is only ${pct(r.confidence)} sure. Retake the photo closer, in daylight, or compare with the alternatives below.</div>`;
   } else if (r.urgency === "high" && !r.healthy) {
@@ -45,7 +51,7 @@ export function showResult(r, imageSrc) {
 
     <div class="result-head">
       <div class="ring" style="--v:${r.health_score};--c:${healthColor(r.health_score)}">
-        <div><b>${r.health_score}</b><small>health</small></div>
+        <div><b>${r.status === "no_plant" ? "–" : r.health_score}</b><small>health</small></div>
       </div>
       <div>
         <span class="badge ${r.status}">${STATUS_TEXT[r.status] || r.status}</span>
@@ -54,21 +60,45 @@ export function showResult(r, imageSrc) {
       </div>
     </div>
     ${alert}
+    ${plant?.toxic ? `<div class="alert warn">⚠️ ${esc(plant.toxic)}.</div>` : ""}
 
+    ${r.status === "no_plant" ? "" : `
     <div class="kv">
       <div><span>Confidence</span><b>${pct(r.confidence)}</b></div>
-      <div><span>Infected area</span><b>${r.healthy ? "–" : `${r.severity}%`}</b></div>
-      <div><span>Severity</span><b style="color:${SEVERITY_COLOR[r.severity_level] || "inherit"}">${esc(r.severity_level)}</b></div>
+      <div><span>Infected area</span><b>${measured ? `${r.severity}%` : "–"}</b></div>
+      <div><span>Severity</span><b style="color:${SEVERITY_COLOR[r.severity_level] || "inherit"}">${esc(measured || r.healthy ? r.severity_level : "n/a")}</b></div>
     </div>
-    ${r.healthy ? "" : `<div class="meter" title="Infected leaf area"><i style="width:${Math.min(100, r.severity)}%;--c:${SEVERITY_COLOR[r.severity_level]}"></i></div>`}
+    ${measured ? `<div class="meter" title="Infected leaf area"><i style="width:${Math.min(100, r.severity)}%;--c:${SEVERITY_COLOR[r.severity_level]}"></i></div>` : ""}
+    ${plant?.variegated ? `<p class="muted small">This plant has naturally coloured or patterned leaves, so the infected area is not measured from colour.</p>` : ""}`}
 
+    ${r.species_top?.length ? `
     <details class="block" open>
-      <summary>Top predictions</summary>
+      <summary>Plant identification</summary>
+      <div class="top3">${r.species_top.map((p) => `
+        <div><span>${esc(p.name)}${p.hindi ? ` · ${esc(p.hindi)}` : ""} <i class="muted">${esc(p.scientific)}</i></span><b>${pct(p.confidence)}</b>
+        <div class="meter"><i style="width:${p.confidence * 100}%"></i></div></div>`).join("")}
+      </div>
+    </details>` : ""}
+
+    ${plant ? `
+    <details class="block">
+      <summary>Care &amp; common problems</summary>
+      <div>
+        <p class="muted small">${esc(plant.category)}${plant.uses ? ` · ${esc(plant.uses)}` : ""}</p>
+        ${Object.entries({ Light: plant.care?.sun, Water: plant.care?.water, Soil: plant.care?.soil })
+          .filter(([, v]) => v && v !== "-").map(([k, v]) => `<p><b>${k}:</b> ${esc(v)}</p>`).join("")}
+        <b>Common problems</b>${list(plant.problems)}
+      </div>
+    </details>` : ""}
+
+    ${r.top3?.length ? `
+    <details class="block" open>
+      <summary>Health check · ${r.source === "condition_model" ? "leaf-condition model" : "crop disease model"}</summary>
       <div class="top3">${r.top3.map((p) => `
         <div><span>${esc(p.crop)} – ${esc(p.disease)}</span><b>${pct(p.confidence)}</b>
         <div class="meter"><i style="width:${p.confidence * 100}%"></i></div></div>`).join("")}
       </div>
-    </details>
+    </details>` : ""}
 
     ${info.symptoms ? `
     <details class="block" ${r.healthy ? "" : "open"}>
@@ -126,9 +156,11 @@ function speak(r) {
   if (!("speechSynthesis" in window)) return;
   speechSynthesis.cancel();
   const info = r.info || {};
-  const text = r.healthy
+  const text = r.status === "no_plant" ? "No plant was detected. Point the camera at a plant or a leaf."
+    : r.healthy
     ? `This ${r.crop} leaf looks healthy. ${(info.prevention || []).slice(0, 2).join(". ")}.`
-    : `${r.crop}: ${r.disease}. ${Math.round(r.confidence * 100)} percent confidence. About ${r.severity} percent of the leaf is affected. ` +
+    : `${r.crop}: ${r.disease}. ${Math.round(r.confidence * 100)} percent confidence. ` +
+      (r.severity_reliable === false ? "" : `About ${r.severity} percent of the leaf is affected. `) +
       `Organic treatment: ${(info.organic || []).join(". ")}.`;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-IN";

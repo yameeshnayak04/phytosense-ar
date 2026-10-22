@@ -20,8 +20,13 @@ MODEL_ID = os.getenv("PHYTO_MODEL", "kimcomehome/plantvillage-vit-leaf-disease")
 MODEL_DIR = BACKEND_DIR / "model"
 ONNX_THREADS = int(os.getenv("PHYTO_THREADS", "2"))
 
+# Plant identification + leaf-condition model (training/train_plant_id_model.ipynb).
+PLANT_MODEL_FILE = "plant_model.onnx"
+
 # Below this confidence the app asks the user to retake the photo.
 MIN_CONFIDENCE = float(os.getenv("PHYTO_MIN_CONFIDENCE", "0.55"))
+# Below this the species is shown as "Unknown plant" (best guess listed as an alternative).
+MIN_SPECIES_CONFIDENCE = float(os.getenv("PHYTO_MIN_SPECIES_CONFIDENCE", "0.35"))
 
 # Oldest scans (and their photos) are deleted beyond this many – keeps a public
 # deployment's disk from filling up.

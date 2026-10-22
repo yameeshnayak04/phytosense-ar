@@ -1,5 +1,5 @@
 // Service worker: caches the app shell so the UI opens offline (diagnosis still needs the server).
-const CACHE = "phytosense-v1";
+const CACHE = "phytosense-v2";
 const SHELL = ["./", "index.html", "css/styles.css", "js/app.js", "js/ar.js", "js/overlay.js", "js/result.js",
   "js/history.js", "js/chat.js", "js/library.js", "js/util.js", "icons/icon.svg", "icons/icon-192.png", "manifest.webmanifest"];
 
